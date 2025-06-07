@@ -10,7 +10,7 @@
 ##  快速使用
 
 打开页面即可进行编码或解码：  
-🔗 https://get.xiaoheicat.com/
+https://get.xiaoheicat.com/
 
 1. 输入原始内容
 2. 选择模式（编码 / 解码 / 跳转）
