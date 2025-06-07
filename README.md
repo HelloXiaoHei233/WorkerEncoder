@@ -1,4 +1,4 @@
-# WorkerEncoder
+# 基于Workers的编解码及跳转小工具
 
 一个轻量、免部署、自托管的编解码 + 跳转工具，基于 [Cloudflare Workers](https://workers.cloudflare.com/) 实现，支持多种编码方式，包括 Base64、Unicode、Morse、转义编码、CodePoint 等等。  
 支持生成 API 链接、页面交互，也支持 `jmp` 跳转模式，便于绕过部分平台对链接或关键字的屏蔽审查。
