@@ -516,146 +516,12 @@ const documentation = `<!DOCTYPE html>
   </div>
 
   <script>
-    // 编码器定义（与服务器端保持一致）
-    const encodings = {
-      Base64: {
-        encode: s => btoa(unescape(encodeURIComponent(s))),
-        decode: s => decodeURIComponent(escape(atob(s)))
-      },
-      UnicodeEscapeShort: {
-        encode: s => [...s].map(c => \`\\\\u\${c.charCodeAt(0).toString(16).padStart(4,'0')}\`).join(''),
-        decode: s => s.replace(/\\\\u([\\\\da-fA-F]{4})/g, (_,h) => String.fromCharCode(parseInt(h,16)))
-      },
-      UnicodeEscapeLong: {
-        encode: s => [...s].map(c => \`\\\\U\${c.charCodeAt(0).toString(16).padStart(8,'0')}\`).join(''),
-        decode: s => s.replace(/\\\\U([\\\\da-fA-F]{8})/g, (_,h) => String.fromCodePoint(parseInt(h,16)))
-      },
-      DecEntity: {
-        encode: s => [...s].map(c => \`&#\${c.charCodeAt(0)};\`).join(''),
-        decode: s => s.replace(/&#(\\\\d+);/g, (_,d) => String.fromCharCode(d))
-      },
-      HexEntity: {
-        encode: s => [...s].map(c => \`&#x\${c.charCodeAt(0).toString(16)};\`).join(''),
-        decode: s => s.replace(/&#x([\\\\da-fA-F]+);/g, (_,h) => String.fromCharCode(parseInt(h,16)))
-      },
-      HexEscape: {
-        encode: s => [...s].map(c => \`\\\\x\${c.charCodeAt(0).toString(16).padStart(2,'0')}\`).join(''),
-        decode: s => s.replace(/\\\\x([\\\\da-fA-F]{2})/g, (_,h) => String.fromCharCode(parseInt(h,16)))
-      },
-      OctalEscape: {
-        encode: s => [...s].map(c => \`\\\\\${c.charCodeAt(0).toString(8).padStart(3,'0')}\`).join(''),
-        decode: s => s.replace(/\\\\([0-7]{3})/g, (_,o) => String.fromCharCode(parseInt(o,8)))
-      },
-      URL: { 
-        encode: encodeURIComponent, 
-        decode: decodeURIComponent 
-      },
-      Unicode: {
-        encode: s => [...s].map(c => \`\\\\u\${c.charCodeAt(0).toString(16).padStart(4,'0')}\`).join(''),
-        decode: s => s.replace(/\\\\u([\\\\da-fA-F]{4})/g, (_,h) => String.fromCharCode(parseInt(h,16)))
-      },
-      Hex: {
-        encode: s => Array.from(new TextEncoder().encode(s), b => b.toString(16).padStart(2,'0')).join(''),
-        decode: s => new TextDecoder().decode(new Uint8Array((s.match(/[\\\\da-fA-F]{2}/g)||[]).map(h => parseInt(h,16))))
-      },
-      Dec: {
-        encode: s => BigInt('0x'+encodings.Hex.encode(s)).toString(),
-        decode: s => encodings.Hex.decode(BigInt(s).toString(16).replace(/^00+/,'').padStart(2,'0'))
-      },
-      Bin: {
-        encode: s => encodings.Hex.encode(s).match(/../g).map(h => parseInt(h,16).toString(2).padStart(8,'0')).join(''),
-        decode: s => encodings.Hex.decode(s.match(/.{8}/g).map(b => parseInt(b,2).toString(16).padStart(2,'0')).join(''))
-      },
-      MorseCode: {
-        encode: s => s.toUpperCase().split('').map(c => morseMap[c]||'').filter(Boolean).join(' '),
-        decode: s => s.split(/[^.-]/).map(c => reverseMorseMap[c]||'').join('').toLowerCase()
-      },
-      CodePoint: {
-        encode: s => [...s].map(c => c.codePointAt(0)).join(','),
-        decode: s => s.split(',').map(cp => String.fromCodePoint(cp)).join('')
-      },
-      Base32: { 
-        encode: s => base32.encode(s), 
-        decode: s => base32.decode(s) 
-      },
-      Base16: {
-        encode: s => [...s].map(c => c.charCodeAt(0).toString(16).padStart(2,'0')).join(''),
-        decode: s => (s.match(/.{2}/g)||[]).map(p => String.fromCharCode(parseInt(p,16))).join('')
-      }
-    }
-
-    // 摩斯电码映射
-    const morseMap = {
-      'A':'.-', 'B':'-...', 'C':'-.-.', 'D':'-..', 'E':'.', 'F':'..-.',
-      'G':'--.', 'H':'....', 'I':'..', 'J':'.---', 'K':'-.-', 'L':'.-..',
-      'M':'--', 'N':'-.', 'O':'---', 'P':'.--.', 'Q':'--.-', 'R':'.-.',
-      'S':'...', 'T':'-', 'U':'..-', 'V':'...-', 'W':'.--', 'X':'-..-',
-      'Y':'-.--', 'Z':'--..', '0':'-----', '1':'.----', '2':'..---',
-      '3':'...--', '4':'....-', '5':'.....', '6':'-....', '7':'--...',
-      '8':'---..', '9':'----.', ' ':'/'
-    }
-
-    const reverseMorseMap = Object.entries(morseMap).reduce((a,[k,v]) => (a[v]=k,a), {})
-
-    // Base32 编码器
-    const base32Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
-    const base32 = {
-      encode: str => {
-        let bits = ''
-        const bytes = new TextEncoder().encode(str)
-        for (const byte of bytes) bits += byte.toString(2).padStart(8, '0')
-        
-        let encoded = ''
-        for (let i = 0; i < bits.length; i += 5) {
-          const chunk = bits.substr(i, 5).padEnd(5, '0')
-          encoded += base32Chars[parseInt(chunk, 2)]
-        }
-        return encoded + '='.repeat((8 - (encoded.length % 8)) % 8)
-      },
-      
-      decode: b32 => {
-        b32 = b32.replace(/=+$/, '').toUpperCase()
-        let bits = ''
-        for (const char of b32) {
-          const index = base32Chars.indexOf(char)
-          bits += index.toString(2).padStart(5, '0')
-        }
-        
-        const bytes = []
-        for (let i = 0; i < bits.length; i += 8) {
-          const chunk = bits.substr(i, 8).padEnd(8, '0')
-          bytes.push(parseInt(chunk, 2))
-        }
-        return new TextDecoder().decode(new Uint8Array(bytes))
-      }
-    }
-
     async function processRequest() {
       const input = document.getElementById('inputText').value
       const mode = document.getElementById('modeSelect').value
       const encoding = document.getElementById('encodingSelect').value
       
       try {
-        // 检查跳转模式下的链接处理
-        if (mode === 'jmp' && isUrl(input)) {
-          const encodedResult = encodings[encoding].encode(input)
-          const jumpUrl = \`\${window.location.origin}/?jmp&\${encoding}=\${encodeURIComponent(encodedResult)}\`
-          
-          document.getElementById('resultOutput').textContent = \`检测到链接，已自动转换为"\${encoding}"并生成跳转链接\`
-          document.getElementById('encodedResult').textContent = encodedResult
-          document.getElementById('jumpUrl').textContent = jumpUrl
-          document.getElementById('jumpInfo').style.display = 'block'
-          
-          // 隐藏普通复制按钮，显示跳转相关按钮
-          document.getElementById('copyEncodedBtn').style.display = 'inline-block'
-          document.getElementById('copyJumpBtn').style.display = 'inline-block'
-          document.querySelector('.copy-btn').style.display = 'none'
-          document.querySelector('.copy-btn:nth-child(2)').style.display = 'none'
-          
-          document.getElementById('resultContainer').style.display = 'block'
-          return
-        }
-        
         const response = await fetch(\`/?\${mode}&\${encoding}=\${encodeURIComponent(input)}\`)
         
         if (!response.ok) {
@@ -673,7 +539,14 @@ const documentation = `<!DOCTYPE html>
           document.getElementById('encodedResult').textContent = encodedResult
           document.getElementById('jumpUrl').textContent = jumpUrl
           document.getElementById('jumpInfo').style.display = 'block'
-          document.getElementById('resultOutput').textContent = '已编码链接地址并生成跳转链接'
+          
+          // 检查是否为URL检测
+          const isUrl = response.headers.get('X-Is-URL') === 'true'
+          if (isUrl) {
+            document.getElementById('resultOutput').textContent = \`检测到链接，已自动转换为"\${encoding}"并生成跳转链接\`
+          } else {
+            document.getElementById('resultOutput').textContent = '已编码链接地址并生成跳转链接'
+          }
           
           // 隐藏普通复制按钮，显示跳转相关按钮
           document.getElementById('copyEncodedBtn').style.display = 'inline-block'
@@ -702,15 +575,6 @@ const documentation = `<!DOCTYPE html>
         document.getElementById('copyJumpBtn').style.display = 'none'
         document.querySelector('.copy-btn').style.display = 'inline-block'
         document.querySelector('.copy-btn:nth-child(2)').style.display = 'inline-block'
-      }
-    }
-
-    function isUrl(str) {
-      try {
-        new URL(str)
-        return true
-      } catch {
-        return false
       }
     }
 
@@ -811,18 +675,37 @@ async function handleRequest(request) {
     if (!encodingType) return new Response('未识别的编码类型', { status: 400 })
     if (input === null) return new Response('缺少输入内容', { status: 400 })
 
-    // 执行编解码
-    const processor = encodings[encodingType]
-    const result = mode === 'enc' ? processor.encode(input) : processor.decode(input)
-
-    // 处理跳转
+    // 处理跳转模式
     if (mode === 'jmp') {
+      // 检查输入是否为有效URL
       try {
-        return Response.redirect(new URL(result).toString(), 302)
+        new URL(input)
+        // 如果是有效URL，先编码然后返回编码结果
+        const processor = encodings[encodingType]
+        const encodedResult = processor.encode(input)
+        return new Response(encodedResult, {
+          headers: { 
+            'Content-Type': 'text/plain; charset=utf-8',
+            'X-Encoding-Type': encodingType,
+            'X-Processing-Mode': mode,
+            'X-Is-URL': 'true'
+          }
+        })
       } catch(e) {
-        return new Response(`无效跳转目标: ${result}`, { status: 400 })
+        // 如果不是有效URL，尝试解码后跳转
+        const processor = encodings[encodingType]
+        const result = processor.decode(input)
+        try {
+          return Response.redirect(new URL(result).toString(), 302)
+        } catch(redirectError) {
+          return new Response(`无效跳转目标: ${result}`, { status: 400 })
+        }
       }
     }
+
+    // 执行普通编解码
+    const processor = encodings[encodingType]
+    const result = mode === 'enc' ? processor.encode(input) : processor.decode(input)
 
     return new Response(result, {
       headers: { 
